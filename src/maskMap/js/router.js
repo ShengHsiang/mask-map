@@ -2,7 +2,7 @@ import vueRouter from 'vue-router';
 
 export default function (vue) {
   vue.use(vueRouter);
-  var router = new vueRouter({ routes: routes, mode: 'history' });
+  var router = new vueRouter({ routes: routes });
 
   /*路由守卫*/
   router.beforeEach(function (to, from, next) {
