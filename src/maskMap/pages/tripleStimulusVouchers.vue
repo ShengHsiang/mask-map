@@ -15,7 +15,7 @@
           <el-option v-for="item in findDistrictsByCity" :key="item" :value="item"></el-option>
         </el-select>
         <div class="map-toolbox-text">
-          <span>有取得口罩數量的藥局有</span>
+          <span>還有振興三倍卷的郵局有</span>
           <span class="count">{{ storeList && storeList.length || 0 }}</span>家
         </div>
       </div>
@@ -26,18 +26,16 @@
           :key="index"
           @click="handleStoreClick(item)"
         >
-          <div class="title">{{ item.properties.name }}</div>
-          <div class="address">{{ item.properties.address }}</div>
-          <div class="phone">{{ item.properties.phone }}</div>
+          <div class="title">{{ item.storeNm }}</div>
+          <div class="address">{{ item.addr}}</div>
+          <div class="phone">{{ item.tel }}</div>
           <div class="count_wrap">
             <div
               class="item"
-              :class="{'gray': item.properties.mask_adult === 0}"
-            >成人：{{ item.properties.mask_adult }}</div>
-            <div
-              class="item"
-              :class="{'gray': item.properties.mask_child === 0}"
-            >兒童：{{ item.properties.mask_child }}</div>
+              :class="{'gray': item.total === 0}"
+            >
+            數量：{{ item.total }}
+            </div>
           </div>
         </div>
       </div>
@@ -75,6 +73,7 @@ export default {
     }
   },
   async mounted() {
+    document.title = '振興三倍卷地圖'
     // 獲取裝置螢幕高度
     this.getScreenHeight();
     // 加載中效果
@@ -114,9 +113,9 @@ export default {
         item => item.name === this.city
       ).districts[0];
     },
-    // 點擊藥局的事件 -> 跳轉到地圖所在的點
+    // 點擊郵局的事件 -> 跳轉到地圖所在的點
     handleStoreClick(item) {
-      const temp = [item.geometry.coordinates[1], item.geometry.coordinates[0]];
+      const temp = [item.latitude, item.longitude];
       this.map.flyTo(temp, 18);
       let popup = this.$map.createPopup({
         maxWidth: 350,
@@ -126,30 +125,24 @@ export default {
       popup.setLatLng(temp).setContent(this.setPopupContent(item));
       this.map.openPopup(popup);
     },
-    // 調用接口獲取藥局資料
+    // 調用接口獲取郵局資料
     fetchData() {
       const url =
-        "https://raw.githubusercontent.com/kiang/pharmacies/master/json/points.json?fbclid=IwAR08mKKy05bPBaRJfMU33fhIsj-4y8G2ec9vteF2eLXBzF9z3SPuIZHeQks";
+        "https://3000.gov.tw/hpgapi-openmap/api/getPostData";
       return axios.get(url).then(res => {
-        if (res.status === 200) {
-          if (res.data.hasOwnProperty("features")) {
-            this.maskData = res.data.features;
-            console.log(res.data)
-          }
+        if (res.status === 200 && res.data.length > 0) {
+          this.maskData = res.data;
+          console.log(res.data[0])
         }
       });
     },
     // 篩選符合縣市區的藥局
     filterData() {
-      const condition = this.city + this.districts;
       const storeData = this.maskData.filter(item => {
-        if (item.properties.address.charAt(0) === "台") {
-          const newAddress = item.properties.address.slice(1);
-          item.properties.address = "臺".concat(newAddress);
-        }
         return (
-          item.properties.address.indexOf(condition) != -1 &&
-          (item.properties.mask_adult > 0 || item.properties.mask_child > 0)
+          item.hsnNm === this.city
+          && item.townNm === this.districts 
+          // && item.total > 0
         );
       });
       this.storeList = storeData;
@@ -158,7 +151,8 @@ export default {
     setMaskMakers(data) {
       const cluster = this.$map.createMakerCluster();
       data.forEach(element => {
-        const marker = this.$map.createMakerByXY(element.geometry.coordinates);
+        const geometry = [element.longitude, element.latitude]
+        const marker = this.$map.createMakerByXY(geometry);
         // 1. 創建 popup
         let popup = this.$map.createPopup({
           maxWidth: 350,
@@ -175,27 +169,24 @@ export default {
     },
     // popup 圖層的樣式
     setPopupContent(element) {
-      let adultStr = `<div class="item">成人口罩：${element.properties.mask_adult} 個</div>`;
-      let childStr = `<div class="item">兒童口罩：${element.properties.mask_child} 個</div>`;
-      if (element.properties.mask_adult === 0) {
-        adultStr = `<div class="item gray">成人口罩：${element.properties.mask_adult} 個</div>`;
-      } else if (element.properties.mask_child > 0) {
-        childStr = `<div class="item gray">兒童口罩：${element.properties.mask_child} 個</div>`;
+      let count = `<div class="item">振興卷數量：${element.total} 個</div>`;
+      if (element.total === 0) {
+        count = `<div class="item gray">振興卷數量：${element.total} 個</div>`;
       }
-      const search = element.properties.address + "+" + element.properties.name;
-      return `<h1>${element.properties.name}</h1>
-          <div class="row">電話：${element.properties.phone}</div>
+      const search = element.addr;
+      return `<h1>${element.storeNm}</h1>
+          <div class="row">電話：${element.tel}</div>
           <div class="row">
             地址：
-            <a target="_blank" href="https://www.google.com.tw/maps/place/${search}">${
-        element.properties.address
-      }</a>
+            <a target="_blank" href="https://www.google.com.tw/maps/place/${search}">${element.addr}</a>
+          </div>
+          <div class="row">
+            營業時間：${element.busiTime}
           </div>
           <div class="count_wrap row">
-            ${adultStr}${childStr}
+            ${count}
           </div>
-          <div class="row">更新時間：${element.properties.updated ||
-            "未知"}</div>`;
+          <div class="row">更新時間：${ element.updateDate || "未知" }</div>`;
     },
     // 設置 螢幕高度 vh 使其在手機版網頁也能正確響應
     getScreenHeight() {
@@ -330,7 +321,7 @@ export default {
   border-radius: 6px;
   overflow: hidden;
   .item {
-    width: 50%;
+    width: 100%;
     height: 35px;
     background-color: #668afe;
     display: flex;

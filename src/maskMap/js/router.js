@@ -4,7 +4,7 @@ export default function (vue) {
   vue.use(vueRouter);
   var router = new vueRouter({ routes: routes });
 
-  /*路由守卫*/
+  /* 路由守衛 */
   router.beforeEach(function (to, from, next) {
     next();
   });
@@ -16,6 +16,10 @@ const routes = [
   {
     path: '/',
     component: () => import('../pages/Map.vue')
+  },
+  {
+    path: '/triple',
+    component: () => import('../pages/tripleStimulusVouchers.vue')
   },
   {
     name: 'page404',
